@@ -26,7 +26,7 @@
 </style>
 </head>
 <body>
-<h1>On-Device Remover <span class="ok-badge">nothing leaves this phone</span></h1>
+<h1>On-Device Remover <span class="ok-badge">v4</span> <span class="ok-badge">nothing leaves this phone</span></h1>
 <div class="sub">Decode → clean → re-record all happen in your browser. No upload, no server.</div>
 <div class="hint" id="selftest" style="margin-bottom:12px"></div>
 
@@ -44,7 +44,7 @@
   </div>
   <div class="hint">Drag a rectangle over the watermark on the first frame.</div>
   <label><input type="checkbox" id="moving"> Watermark moves (track it frame-to-frame)</label>
-  <label><input type="checkbox" id="guarantee"> Guaranteed erase — clear everything in the box (use if any text remains)</label>
+  <label><input type="checkbox" id="guarantee" checked> <b>Maximum removal (default)</b> — clears the whole box so 100% of the text is gone. Untick to preserve the background/face (smart, may leave faint residue).</label>
   <button id="go" disabled>▶ Process &amp; record clean video</button>
   <div id="status"></div>
   <a id="dl" class="dl" style="display:none" download="clean.webm">⬇ Download clean video</a>
@@ -213,7 +213,7 @@ go.addEventListener('click',async()=>{
     const before=err(d.data);
     const m=textMask(d,{x:30,y:38,w:140,h:24});inpaint(d,m,{x:30,y:38,w:140,h:24});
     const after=err(d.data);
-    $('selftest').textContent='Self-test on this device: text error '+before.toFixed(0)+' → '+after.toFixed(1)+(after<10?' ✔ removal engine OK':' ✘ engine problem');
+    $('selftest').textContent='v4 · self-test on this device: text error '+before.toFixed(0)+' → '+after.toFixed(1)+(after<10?' ✔ removal engine OK':' ✘ engine problem');
   }catch(e){$('selftest').textContent='Self-test error: '+e.message;}
 })();
 </script>
