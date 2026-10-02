@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Model weights — downloaded separately, see scripts/fetch_model.py (Apache-2.0)
+models/*.onnx
+
+# User data / render outputs — never commit personal videos
+data/uploads/
+data/outputs/
+
+# Large generated media in docs (keep the small png/jpg evidence, drop videos)
+docs/*.mp4
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/

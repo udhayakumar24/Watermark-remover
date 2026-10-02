@@ -1,0 +1,5 @@
+flask>=3.0
+numpy>=1.26
+opencv-python>=4.9
+onnxruntime>=1.17
+imageio-ffmpeg>=0.5
