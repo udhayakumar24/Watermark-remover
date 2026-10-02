@@ -28,6 +28,7 @@
 <body>
 <h1>On-Device Remover <span class="ok-badge">nothing leaves this phone</span></h1>
 <div class="sub">Decode → clean → re-record all happen in your browser. No upload, no server.</div>
+<div class="hint" id="selftest" style="margin-bottom:12px"></div>
 
 <div class="card">
   <input type="file" id="file" accept="video/*">
@@ -53,27 +54,30 @@
 const $=id=>document.getElementById(id);
 const file=$('file'),v=$('v'),c=$('c'),overlay=$('overlay'),boxEl=$('box'),go=$('go'),status=$('status'),dl=$('dl'),moving=$('moving');
 const ctx=c.getContext('2d',{willReadFrequently:true});
-let VW=0,VH=0,box=null,firstFrame=null,proc=false;
+let VW=0,VH=0,box=null,firstFrame=null,proc=false,grabbed=false;
 
 file.addEventListener('change',()=>{
   const f=file.files[0]; if(!f)return;
+  grabbed=false;box=null;boxEl.style.display='none';go.disabled=true;dl.style.display='none';
   v.src=URL.createObjectURL(f);
   v.addEventListener('loadeddata',()=>{
-    VW=v.videoWidth;VH=v.videoHeight;
+    const sw=Math.min(v.videoWidth,720);           // cap width so phones keep up
+    VW=sw;VH=Math.round(v.videoHeight*sw/v.videoWidth);
     c.width=VW;c.height=VH;c.style.display='none';
     v.style.display='block';
     $('stage').style.display='block';$('step2').style.display='block';
-    v.currentTime=0;
+    v.currentTime=0.01;                            // force a real seek so a frame is decoded
+    grabFirst();
   },{once:true});
-  v.addEventListener('seeked',()=>{ grabFirst(); },{once:true});
+  v.addEventListener('seeked',()=>{ if(!grabbed)grabFirst(); });
 });
 
 function grabFirst(){
-  // draw first frame to canvas to allow boxing + processing
+  if(grabbed||!VW)return;
   ctx.drawImage(v,0,0,VW,VH);
   firstFrame=ctx.getImageData(0,0,VW,VH);
   v.style.display='none';c.style.display='block';
-  go.disabled=false;status.textContent='Box the watermark, then press Process.';
+  grabbed=true;go.disabled=false;status.textContent='Box the watermark, then press Process.';
 }
 
 // ---- box drawing (pointer events, works on touch) ----
@@ -187,6 +191,20 @@ go.addEventListener('click',async()=>{
   function cur(){ctx.drawImage(v,0,0,VW,VH);return ctx.getImageData(0,0,VW,VH);}
   requestAnimationFrame(loop);
 });
+
+// ---- on-load self-test: proves the removal math works in THIS browser ----
+(function(){
+  try{
+    const W=200,H=100,d={width:W,height:H,data:new Uint8ClampedArray(W*H*4)};
+    for(let j=0;j<H;j++)for(let i=0;i<W;i++){const p=(j*W+i)*4;const b=80+(i/W)*60;d.data[p]=b;d.data[p+1]=b;d.data[p+2]=b;d.data[p+3]=255;}
+    const tp=[];for(let j=45;j<=52;j++)for(let i=40;i<=160;i++){const p=(j*W+i)*4;d.data[p]=230;d.data[p+1]=230;d.data[p+2]=230;tp.push(j*W+i);}
+    const err=D=>{let s=0;for(const q of tp){const p=q*4;s+=Math.abs(D[p]-(80+((q%W)/W)*60));}return s/tp.length;};
+    const before=err(d.data);
+    const m=textMask(d,{x:30,y:38,w:140,h:24});inpaint(d,m,{x:30,y:38,w:140,h:24});
+    const after=err(d.data);
+    $('selftest').textContent='Self-test on this device: text error '+before.toFixed(0)+' → '+after.toFixed(1)+(after<10?' ✔ removal engine OK':' ✘ engine problem');
+  }catch(e){$('selftest').textContent='Self-test error: '+e.message;}
+})();
 </script>
 </body>
 </html>
