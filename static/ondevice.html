@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>On-Device Watermark Remover</title>
+<style>
+  :root{--bg:#0b0f14;--panel:#121a23;--line:#22303d;--text:#e8eef4;--muted:#9fb0bf;--accent:#4cc2ff;--ok:#3ddc97}
+  *{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--text);padding:14px}
+  h1{font-size:20px;margin:4px 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+  .ok-badge{display:inline-block;color:var(--ok);border:1px solid rgba(61,220,151,.4);background:rgba(61,220,151,.08);border-radius:99px;padding:3px 10px;font-size:11px;margin-left:6px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+  button{background:var(--accent);color:#04121c;border:0;border-radius:10px;padding:12px 16px;font-weight:600;font-size:15px;width:100%;margin-top:8px}
+  button:disabled{opacity:.4}
+  button.ghost{background:var(--panel);color:var(--text);border:1px solid var(--line)}
+  label{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--muted);margin-top:8px}
+  input[type=file]{color:var(--muted);font-size:13px}
+  #stage{position:relative;width:100%;border-radius:10px;overflow:hidden;background:#000;display:none}
+  #stage video,#stage canvas{width:100%;display:block}
+  #overlay{position:absolute;inset:0;touch-action:none}
+  #box{position:absolute;border:2px solid var(--accent);background:rgba(76,194,255,.15);display:none}
+  #status{font-size:13px;color:var(--muted);margin-top:8px;min-height:18px}
+  a.dl{display:block;text-align:center;background:var(--ok);color:#04121c;border-radius:10px;padding:12px;font-weight:700;text-decoration:none;margin-top:10px}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+<h1>On-Device Remover <span class="ok-badge">nothing leaves this phone</span></h1>
+<div class="sub">Decode → clean → re-record all happen in your browser. No upload, no server.</div>
+
+<div class="card">
+  <input type="file" id="file" accept="video/*">
+  <div class="hint">Pick a video. It stays on this device the whole time.</div>
+</div>
+
+<div class="card" id="step2" style="display:none">
+  <div id="stage">
+    <video id="v" playsinline muted></video>
+    <canvas id="c"></canvas>
+    <div id="overlay"></div>
+    <div id="box"></div>
+  </div>
+  <div class="hint">Drag a rectangle over the watermark on the first frame.</div>
+  <label><input type="checkbox" id="moving"> Watermark moves (track it frame-to-frame)</label>
+  <button id="go" disabled>▶ Process &amp; record clean video</button>
+  <div id="status"></div>
+  <a id="dl" class="dl" style="display:none" download="clean.webm">⬇ Download clean video</a>
+</div>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const file=$('file'),v=$('v'),c=$('c'),overlay=$('overlay'),boxEl=$('box'),go=$('go'),status=$('status'),dl=$('dl'),moving=$('moving');
+const ctx=c.getContext('2d',{willReadFrequently:true});
+let VW=0,VH=0,box=null,firstFrame=null,proc=false;
+
+file.addEventListener('change',()=>{
+  const f=file.files[0]; if(!f)return;
+  v.src=URL.createObjectURL(f);
+  v.addEventListener('loadeddata',()=>{
+    VW=v.videoWidth;VH=v.videoHeight;
+    c.width=VW;c.height=VH;c.style.display='none';
+    v.style.display='block';
+    $('stage').style.display='block';$('step2').style.display='block';
+    v.currentTime=0;
+  },{once:true});
+  v.addEventListener('seeked',()=>{ grabFirst(); },{once:true});
+});
+
+function grabFirst(){
+  // draw first frame to canvas to allow boxing + processing
+  ctx.drawImage(v,0,0,VW,VH);
+  firstFrame=ctx.getImageData(0,0,VW,VH);
+  v.style.display='none';c.style.display='block';
+  go.disabled=false;status.textContent='Box the watermark, then press Process.';
+}
+
+// ---- box drawing (pointer events, works on touch) ----
+let drag=null;
+function pos(e){const r=overlay.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*VW,y:(e.clientY-r.top)/r.height*VH};}
+overlay.addEventListener('pointerdown',e=>{drag=pos(e);box={x:drag.x,y:drag.y,w:0,h:0};overlay.setPointerCapture(e.pointerId);drawBox();});
+overlay.addEventListener('pointermove',e=>{if(!drag)return;const p=pos(e);box={x:Math.min(drag.x,p.x),y:Math.min(drag.y,p.y),w:Math.abs(p.x-drag.x),h:Math.abs(p.y-drag.y)};drawBox();});
+overlay.addEventListener('pointerup',()=>{drag=null;});
+function drawBox(){
+  if(!box)return;const r=overlay.getBoundingClientRect();
+  boxEl.style.display='block';
+  boxEl.style.left=(box.x/VW*r.width)+'px';boxEl.style.top=(box.y/VH*r.height)+'px';
+  boxEl.style.width=(box.w/VW*r.width)+'px';boxEl.style.height=(box.h/VH*r.height)+'px';
+}
+
+// ---- image helpers ----
+function gray(d){const g=new Float32Array(d.width*d.height);for(let i=0,p=0;i<g.length;i++,p+=4){g[i]=0.299*d.data[p]+0.587*d.data[p+1]+0.114*d.data[p+2];}return g;}
+function boxblur(g,w,h,r){
+  const t=new Float32Array(g.length),o=new Float32Array(g.length);
+  for(let y=0;y<h;y++){let s=0;for(let x=-r;x<=r;x++)s+=g[y*w+Math.min(w-1,Math.max(0,x))];
+    for(let x=0;x<w;x++){t[y*w+x]=s/(2*r+1);s+=g[y*w+Math.min(w-1,x+r+1)]-g[y*w+Math.max(0,x-r)];}}
+  for(let x=0;x<w;x++){let s=0;for(let y=-r;y<=r;y++)s+=t[Math.min(h-1,Math.max(0,y))*w+x];
+    for(let y=0;y<h;y++){o[y*w+x]=s/(2*r+1);s+=t[Math.min(h-1,y+r+1)*w+x]-t[Math.max(0,y-r)*w+x];}}
+  return o;
+}
+function textMask(d,bx){
+  const {x,y,w,h}=bx;const g=gray(d);const bl=boxblur(g,d.width,d.height,5);
+  const m=new Uint8Array(d.width*d.height);
+  for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++){const p=j*d.width+i;if(Math.abs(g[p]-bl[p])>11)m[p]=1;}
+  // dilate 1
+  const m2=new Uint8Array(m);
+  for(let j=y+1;j<y+h-1;j++)for(let i=x+1;i<x+w-1;i++){const p=j*d.width+i;if(m[p]){m2[p+1]=1;m2[p-1]=1;m2[p+d.width]=1;m2[p-d.width]=1;}}
+  return m2;
+}
+function inpaint(d,mask,bx){
+  const {x,y,w,h}=bx;const W=d.width;const D=d.data;
+  for(let pass=0;pass<4;pass++){
+    for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++){
+      const p=j*W+i;if(!mask[p])continue;
+      let r=0,g=0,b=0,n=0;
+      for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){
+        if(!di&&!dj)continue;const q=(j+dj)*W+(i+di);
+        if(i+di<0||i+di>=W||j+dj<0||j+dj>=d.height)continue;
+        const wgt=mask[q]?(pass>0?1:0):1; if(!wgt)continue;
+        r+=D[q*4];g+=D[q*4+1];b+=D[q*4+2];n++;
+      }
+      if(n){D[p*4]=r/n;D[p*4+1]=g/n;D[p*4+2]=b/n;}
+    }
+  }
+}
+
+// ---- simple tracker: correlate high-pass magnitude in a window ----
+let lastBox=null;
+function track(d){
+  if(!lastBox)return box;
+  const g=gray(d);const bl=boxblur(g,d.width,d.height,5);
+  const bw=box?box.w:lastBox.w,bh=box?box.h:lastBox.h;
+  let best=null,bestS=1e18;
+  const R=24;
+  for(let dy=-R;dy<=R;dy+=3)for(let dx=-R;dx<=R;dx+=3){
+    const nx=Math.round(lastBox.x+dx),ny=Math.round(lastBox.y+dy);
+    if(nx<0||ny<0||nx+bw>=d.width||ny+bh>=d.height)continue;
+    let s=0,cnt=0;
+    for(let j=ny;j<ny+bh;j+=3)for(let i=nx;i<nx+bw;i+=3){const p=j*d.width+i;const hp=Math.abs(g[p]-bl[p]);s+=hp;cnt++;}
+    const score=-s/(cnt||1); // higher hp = more text-like
+    if(score<bestS){bestS=score;best={x:nx,y:ny,w:bw,h:bh};}
+  }
+  return best||lastBox;
+}
+
+// ---- process + record ----
+go.addEventListener('click',async()=>{
+  if(!box||proc)return;proc=true;go.disabled=true;dl.style.display='none';
+  v.muted=false; // route audio into the recorder; it is not sent to speakers
+  lastBox=box;
+  const stream=c.captureStream(30);
+  let recStream=stream;
+  try{
+    const actx=new (window.AudioContext||window.webkitAudioContext)();
+    const src=actx.createMediaElementSource(v);
+    const dest=actx.createMediaStreamDestination();
+    src.connect(dest);
+    recStream=new MediaStream([...stream.getVideoTracks(),...dest.stream.getAudioTracks()]);
+  }catch(e){/* no audio */}
+  const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')?'video/webm;codecs=vp8,opus':'video/webm';
+  const rec=new MediaRecorder(recStream,{mimeType:mime,videoBitsPerSecond:6_000_000});
+  const chunks=[];rec.ondataavailable=e=>chunks.push(e.data);
+  rec.onstop=()=>{
+    const blob=new Blob(chunks,{type:'video/webm'});
+    dl.href=URL.createObjectURL(blob);dl.style.display='block';
+    status.textContent='Done.';proc=false;go.disabled=false;go.textContent='↺ Process again';
+  };
+  rec.start(500);
+  v.currentTime=0;await v.play();
+  const loop=()=>{
+    if(v.ended){rec.stop();return;}
+    let bx=box;
+    if(moving.checked){bx=track(cur());lastBox=bx;}
+    const d=cur();
+    const m=textMask(d,bx);
+    inpaint(d,m,bx);
+    ctx.putImageData(d,0,0);
+    status.textContent='Processing… '+Math.round(v.currentTime/v.duration*100)+'%';
+    requestAnimationFrame(loop);
+  };
+  function cur(){ctx.drawImage(v,0,0,VW,VH);return ctx.getImageData(0,0,VW,VH);}
+  requestAnimationFrame(loop);
+});
+</script>
+</body>
+</html>
