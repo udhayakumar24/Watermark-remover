@@ -1,0 +1,13 @@
+# Render.com blueprint — one-click deploy of the full app (with upload).
+# Dashboard -> New > Blueprint, pick this repo, and Render builds the Dockerfile.
+# Note: the AI (LaMa) mode wants >=2 GB RAM; use at least the "starter" instance,
+# or stick to the Fast/temporal modes on the free tier.
+services:
+  - type: web
+    name: watermark-remover
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"

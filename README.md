@@ -178,6 +178,23 @@ it installed. Override with `WMREMOVER_FFMPEG=/path/to/ffmpeg`.
 
 ---
 
+## Deploy it so it's live with upload
+
+GitHub Pages can only show a static page — it cannot run the Python engine, so it has no
+upload box. To get a *working* public app (with upload) you need a host that runs Python.
+A `Dockerfile` and a `render.yaml` are included:
+
+1. Push this repo to GitHub (done).
+2. On [render.com](https://render.com): **New → Blueprint**, choose the repo — it reads
+   `render.yaml` and builds the `Dockerfile` (FFmpeg + OpenCV + LaMa baked in).
+3. When the deploy finishes, Render gives you a public `https://…onrender.com` URL where
+   you can upload videos and render.
+
+The same `Dockerfile` works on any VPS or on Railway/Fly.io. For fully-private use, skip
+the cloud and just run `./run.sh` on your own machine.
+
+---
+
 ## Legal
 
 Use this only on videos you own or have permission to edit. Removing a watermark from
