@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watermark Remover — local, offline, AI inpainting</title>
+<meta name="description" content="Remove watermarks from video on your own device. Text-only removal that preserves faces, per-frame tracking for moving logos, and LaMa neural inpainting. Nothing is uploaded.">
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121a23; --line:#22303d; --text:#e8eef4; --muted:#9fb0bf;
+    --accent:#4cc2ff; --ok:#3ddc97; --warn:#ffb454;
+  }
+  *{box-sizing:border-box} html{scroll-behavior:smooth}
+  body{margin:0;font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  .wrap{max-width:960px;margin:0 auto;padding:0 20px}
+  header{padding:64px 0 24px;text-align:center}
+  h1{font-size:clamp(28px,5vw,44px);margin:0 0 8px;letter-spacing:-.5px}
+  h1 .grad{background:linear-gradient(90deg,var(--accent),var(--ok));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tag{color:var(--muted);font-size:clamp(15px,2.4vw,18px);max-width:640px;margin:0 auto}
+  .badges{margin-top:18px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .badge{font-size:12px;padding:5px 12px;border:1px solid var(--line);border-radius:99px;color:var(--muted);background:var(--panel)}
+  .badge.green{color:var(--ok);border-color:rgba(61,220,151,.4)}
+  section{padding:36px 0}
+  h2{font-size:22px;margin:0 0 14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .card h3{margin:0 0 6px;font-size:16px}
+  .card p{margin:0;color:var(--muted);font-size:14px}
+  .ico{font-size:22px;display:block;margin-bottom:8px}
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:640px){.compare{grid-template-columns:1fr}}
+  .compare figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .compare img{width:100%;display:block}
+  .compare figcaption{padding:10px 14px;font-size:13px;color:var(--muted)}
+  .compare .good{color:var(--ok)}
+  pre{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;overflow:auto;font:13px/1.7 ui-monospace,Menlo,Consolas,monospace}
+  code{color:var(--accent)}
+  a{color:var(--accent)}
+  .cta{display:flex;gap:12px;justify-content:center;margin-top:26px;flex-wrap:wrap}
+  .btn{display:inline-block;padding:12px 22px;border-radius:12px;font-weight:600;text-decoration:none;font-size:15px}
+  .btn.primary{background:linear-gradient(90deg,var(--accent),var(--ok));color:#04121c}
+  .btn.ghost{border:1px solid var(--line);color:var(--text);background:var(--panel)}
+  footer{padding:40px 0 60px;color:var(--muted);font-size:13px;text-align:center;border-top:1px solid var(--line);margin-top:20px}
+  .note{border:1px solid rgba(255,180,84,.4);background:rgba(255,180,84,.08);border-radius:12px;padding:14px 16px;color:var(--warn);font-size:14px}
+</style>
+</head>
+<body>
+<header class="wrap">
+  <h1>Watermark <span class="grad">Remover</span></h1>
+  <p class="tag">Remove watermarks from video on <b>your own device</b>. It erases only the text — never the face behind it — tracks moving logos frame by frame, and reconstructs what's hidden with neural inpainting.</p>
+  <div class="badges">
+    <span class="badge green">100% local &amp; offline</span>
+    <span class="badge">LaMa AI inpainting</span>
+    <span class="badge">Moving-watermark tracking</span>
+    <span class="badge">Mobile-friendly PWA</span>
+  </div>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/udhayakumar24/Watermark-remover">View the code on GitHub</a>
+    <a class="btn ghost" href="#run">Run it yourself ↓</a>
+  </div>
+</header>
+
+<section class="wrap">
+  <h2>Why it's different</h2>
+  <div class="grid">
+    <div class="card"><span class="ico">🎯</span><h3>Erases only the text</h3><p>A tight glyph mask isolates just the watermark strokes, so a face, mouth, or product behind the text is left bit-for-bit untouched.</p></div>
+    <div class="card"><span class="ico">🧠</span><h3>AI reconstruction</h3><p>Where a stroke crosses a mouth or eye, LaMa (or fast diffusion) rebuilds that tiny gap from the surrounding skin — the feature stays.</p></div>
+    <div class="card"><span class="ico">🎞️</span><h3>Tracks moving logos</h3><p>Per-frame template tracking follows a watermark as it pans, so removal stays locked on across the whole clip.</p></div>
+    <div class="card"><span class="ico">🔒</span><h3>Nothing leaves your device</h3><p>All processing is local — no uploads, no accounts, no cloud. Your footage never touches a server.</p></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>See it work — text across a mouth</h2>
+  <div class="compare">
+    <figure><img src="docs/face_text.png" alt="Frame with watermark text over the mouth"><figcaption><b>Before</b> — semi-transparent watermark stamped across the mouth.</figcaption></figure>
+    <figure><img src="docs/face_ai.png" alt="Same frame after text-only removal"><figcaption class="good"><b>After</b> — text gone, mouth and smile fully preserved.</figcaption></figure>
+  </div>
+  <p style="color:var(--muted);font-size:14px;margin-top:12px">Measured on this frame (mean abs error in the mouth region): leaving the text = <b>21.7</b>, old box-based removal = <b>29.7</b> (worse!), text-only AI removal = <b>3.2</b>.</p>
+</section>
+
+<section class="wrap" id="run">
+  <h2>Run it yourself</h2>
+  <pre>git clone https://github.com/udhayakumar24/Watermark-remover.git
+cd Watermark-remover
+pip install -r requirements.txt
+python scripts/fetch_model.py   # one-time, 88 MB (Apache-2.0)
+./run.sh                        # or: python app.py</pre>
+  <p style="color:var(--muted);font-size:14px">Then open <code>http://localhost:8000</code> on your phone or laptop, drop in a video, draw the box, and render. Works on Windows too via <code>run.bat</code>.</p>
+  <div class="note" style="margin-top:16px">This page is a static project site. The remover itself is a Python app that runs on your machine — it can't run inside GitHub Pages, by design, so your videos stay private.</div>
+</section>
+
+<footer class="wrap">
+  Personal-use tool · LaMa model <a href="https://huggingface.co/opencv/inpainting_lama">Apache-2.0</a> · Only remove watermarks you have the rights to remove.
+</footer>
+</body>
+</html>
