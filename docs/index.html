@@ -33,6 +33,16 @@
   .compare img{width:100%;display:block}
   .compare figcaption{padding:10px 14px;font-size:13px;color:var(--muted)}
   .compare .good{color:var(--ok)}
+  /* Interactive before/after slider */
+  .slider{position:relative;--pos:50%;border:1px solid var(--line);border-radius:14px;overflow:hidden;user-select:none}
+  .slider img{width:100%;display:block;pointer-events:none}
+  .slider .top{position:absolute;inset:0;clip-path:inset(0 calc(100% - var(--pos)) 0 0)}
+  .slider .top img{position:absolute;inset:0}
+  .slider .handle{position:absolute;top:0;bottom:0;left:var(--pos);width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 10px rgba(0,0,0,.7)}
+  .slider .knob{position:absolute;top:50%;left:var(--pos);transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:#fff;color:#0b0f14;display:flex;align-items:center;justify-content:center;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .slider input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:ew-resize;margin:0}
+  .slider .lab{position:absolute;top:10px;font-size:12px;padding:4px 12px;border-radius:99px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px)}
+  .slider .lab.left{left:10px}.slider .lab.right{right:10px;color:var(--ok)}
   pre{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;overflow:auto;font:13px/1.7 ui-monospace,Menlo,Consolas,monospace}
   code{color:var(--accent)}
   a{color:var(--accent)}
@@ -72,10 +82,16 @@
 
 <section class="wrap">
   <h2>See it work — text across a mouth</h2>
-  <div class="compare">
-    <figure><img src="face_text.png" alt="Frame with watermark text over the mouth"><figcaption><b>Before</b> — semi-transparent watermark stamped across the mouth.</figcaption></figure>
-    <figure><img src="face_ai.png" alt="Same frame after text-only removal"><figcaption class="good"><b>After</b> — text gone, mouth and smile fully preserved.</figcaption></figure>
+  <div class="slider" id="ba">
+    <img src="face_ai.png" alt="After: watermark removed, mouth preserved">
+    <div class="top"><img src="face_text.png" alt="Before: watermark over the mouth"></div>
+    <div class="handle"></div>
+    <div class="knob">⇔</div>
+    <span class="lab left">Before</span>
+    <span class="lab right">After</span>
+    <input type="range" id="baRange" min="0" max="100" value="50" aria-label="Drag to compare before and after">
   </div>
+  <p style="color:var(--muted);font-size:14px;margin-top:10px">👆 Drag the handle (or tap anywhere) to wipe the watermark on and off — right over the mouth.</p>
   <p style="color:var(--muted);font-size:14px;margin-top:12px">Measured on this frame (mean abs error in the mouth region): leaving the text = <b>21.7</b>, old box-based removal = <b>29.7</b> (worse!), text-only AI removal = <b>3.2</b>.</p>
 </section>
 
@@ -90,6 +106,19 @@ python scripts/fetch_model.py   # one-time, 88 MB (Apache-2.0)
   <div class="note" style="margin-top:16px">This page is a static project site. The remover itself is a Python app that runs on your machine — it can't run inside GitHub Pages, by design, so your videos stay private.</div>
 </section>
 
+<script>
+(function(){
+  var s=document.getElementById('ba'), r=document.getElementById('baRange');
+  function set(v){ s.style.setProperty('--pos', v+'%'); r.value=v; }
+  var user=false;
+  r.addEventListener('input', function(){ user=true; set(+r.value); });
+  s.addEventListener('pointerdown', function(){ user=true; });
+  // gentle auto-sweep so the page is alive on load, until the visitor grabs it
+  var t0=null;
+  function loop(ts){ if(user) return; if(t0===null)t0=ts; set((50+45*Math.sin((ts-t0)/1200)).toFixed(1)); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+})();
+</script>
 <footer class="wrap">
   Personal-use tool · LaMa model <a href="https://huggingface.co/opencv/inpainting_lama">Apache-2.0</a> · Only remove watermarks you have the rights to remove.
 </footer>
