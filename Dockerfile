@@ -15,4 +15,5 @@ COPY . .
 RUN python scripts/fetch_model.py
 
 EXPOSE 8000
-CMD ["python", "app.py", "--host", "0.0.0.0", "--port", "8000"]
+# Honor Render's $PORT (falls back to 8000 locally)
+CMD ["sh", "-c", "python app.py --host 0.0.0.0 --port ${PORT:-8000}"]
