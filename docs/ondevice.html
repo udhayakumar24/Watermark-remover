@@ -101,27 +101,31 @@ function boxblur(g,w,h,r){
 }
 function textMask(d,bx){
   const {x,y,w,h}=bx;const g=gray(d);const bl=boxblur(g,d.width,d.height,5);
+  // adaptive threshold from the strongest stroke in the box
+  let maxhp=0;
+  for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++){const hp=Math.abs(g[j*d.width+i]-bl[j*d.width+i]);if(hp>maxhp)maxhp=hp;}
+  if(maxhp<8)return new Uint8Array(d.width*d.height); // nothing text-like here
+  const thr=Math.max(6,Math.min(24,Math.round(maxhp*0.3)));
   const m=new Uint8Array(d.width*d.height);
-  for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++){const p=j*d.width+i;if(Math.abs(g[p]-bl[p])>11)m[p]=1;}
-  // dilate 1
+  for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++){const p=j*d.width+i;if(Math.abs(g[p]-bl[p])>thr)m[p]=1;}
   const m2=new Uint8Array(m);
   for(let j=y+1;j<y+h-1;j++)for(let i=x+1;i<x+w-1;i++){const p=j*d.width+i;if(m[p]){m2[p+1]=1;m2[p-1]=1;m2[p+d.width]=1;m2[p-d.width]=1;}}
   return m2;
 }
-function inpaint(d,mask,bx){
-  const {x,y,w,h}=bx;const W=d.width;const D=d.data;
-  for(let pass=0;pass<4;pass++){
-    for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++){
-      const p=j*W+i;if(!mask[p])continue;
+function inpaint(d,mask,bx){ // onion-peel: fill boundary pixels from known neighbours, erode, repeat
+  const W=d.width,H=d.height,D=d.data;const m=mask.slice();
+  let rem=0;for(let i=0;i<m.length;i++)rem+=m[i];
+  let guard=0;
+  while(rem>0&&guard++<3000){
+    const fill=[];
+    for(let j=0;j<H;j++)for(let i=0;i<W;i++){const p=j*W+i;if(!m[p])continue;
       let r=0,g=0,b=0,n=0;
-      for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){
-        if(!di&&!dj)continue;const q=(j+dj)*W+(i+di);
-        if(i+di<0||i+di>=W||j+dj<0||j+dj>=d.height)continue;
-        const wgt=mask[q]?(pass>0?1:0):1; if(!wgt)continue;
-        r+=D[q*4];g+=D[q*4+1];b+=D[q*4+2];n++;
-      }
-      if(n){D[p*4]=r/n;D[p*4+1]=g/n;D[p*4+2]=b/n;}
-    }
+      for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){if(!di&&!dj)continue;const ii=i+di,jj=j+dj;
+        if(ii<0||ii>=W||jj<0||jj>=H)continue;const q=jj*W+ii;if(m[q])continue;
+        r+=D[q*4];g+=D[q*4+1];b+=D[q*4+2];n++;}
+      if(n>0)fill.push(p,r/n,g/n,b/n);}
+    if(!fill.length)break;
+    for(let k=0;k<fill.length;k+=4){const p=fill[k];D[p*4]=fill[k+1];D[p*4+1]=fill[k+2];D[p*4+2]=fill[k+3];m[p]=0;rem--;}
   }
 }
 
@@ -174,9 +178,10 @@ go.addEventListener('click',async()=>{
     if(moving.checked){bx=track(cur());lastBox=bx;}
     const d=cur();
     const m=textMask(d,bx);
+    let mc=0;for(let i=0;i<m.length;i++)mc+=m[i];
     inpaint(d,m,bx);
     ctx.putImageData(d,0,0);
-    status.textContent='Processing… '+Math.round(v.currentTime/v.duration*100)+'%';
+    status.textContent='Processing '+Math.round(v.currentTime/v.duration*100)+'% · text px '+mc+(mc<10?'  (draw the box tighter on the text)':'');
     requestAnimationFrame(loop);
   };
   function cur(){ctx.drawImage(v,0,0,VW,VH);return ctx.getImageData(0,0,VW,VH);}
