@@ -180,6 +180,8 @@ it installed. Override with `WMREMOVER_FFMPEG=/path/to/ffmpeg`.
 
 ## Deploy it so it's live with upload
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/udhayakumar24/Watermark-remover)
+
 GitHub Pages can only show a static page — it cannot run the Python engine, so it has no
 upload box. To get a *working* public app (with upload) you need a host that runs Python.
 A `Dockerfile` and a `render.yaml` are included:
